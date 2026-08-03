@@ -55,8 +55,8 @@ def index_file(path: Path) -> None:
         for chunk in parser.chunk_markdown(path):
             if chunk.heading:
                 rows.append((rel, chunk.heading, chunk.heading, "heading"))
-        if chunk.text:
-            rows.append((rel, chunk.heading, chunk.text, "body"))
+            if chunk.text:
+                rows.append((rel, chunk.heading, chunk.text, "body"))
 
         conn.executemany(
             "INSERT INTO chunks (path, heading, content, kind) VALUES (?, ?, ?, ?)",
@@ -87,12 +87,12 @@ def ensure_indexed(notes_dir: Path = config.NOTES_DIR) -> None:
 
 
 def _sanitize(query: str) -> str:
-    """Turn free text into a safe FTS5 MATCH expression (prefix OR query)."""
+    """Turn free text into a safe FTS5 MATCH expression (prefix AND query)."""
     cleaned = re.sub(r"[^0-9A-Za-z_]+", " ", query)
     terms = [t for t in cleaned.split() if t]
     if not terms:
         return ""
-    return " OR ".join(f"{t}*" for t in terms)
+    return " AND ".join(f"{t}*" for t in terms)
 
 
 def _like_escape(value: str) -> str:
@@ -117,6 +117,20 @@ def keyword_search(query: str, top_k: int = 20) -> list[dict]:
             (match_expr, top_k),
         )
         rows = cur.fetchall()
+
+        if not rows and " AND " in match_expr:
+            alt_expr = " OR ".join(f"{t}*" for t in cleaned.split())
+            cur = conn.execute(
+                """
+                SELECT path, heading, content, kind, bm25(chunks) AS rank
+                FROM chunks
+                WHERE chunks MATCH ?
+                ORDER BY rank
+                LIMIT ?
+                """,
+                (alt_expr, top_k),
+            )
+            rows = cur.fetchall()
 
         if not rows:
             like_term = f"%{_like_escape(query.strip())}%"

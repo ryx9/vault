@@ -130,7 +130,9 @@ class PKBApp(CommandMixin, DashboardViewsMixin, App):
         log.write(f"[bold]you[/bold]")
         log.write(f"  {text}")
 
-    def _chat_write_assistant(self, text: str, sources: list[str] | None = None) -> None:
+    def _chat_write_assistant(
+        self, text: str, sources: list[str] | None = None
+    ) -> None:
         log = self.query_one("#chat_log", RichLog)
         log.write("")
         log.write("[bold]pkb[/bold]")
@@ -218,7 +220,9 @@ class PKBApp(CommandMixin, DashboardViewsMixin, App):
             with self.suspend():
                 subprocess.run(["nvim", str(path)], check=False)
         except FileNotFoundError:
-            self._chat_write_system("editor not found: nvim is not installed or not in PATH")
+            self._chat_write_system(
+                "editor not found: nvim is not installed or not in PATH"
+            )
             return
         self.refresh_dashboard()
 
@@ -387,7 +391,11 @@ class PKBApp(CommandMixin, DashboardViewsMixin, App):
         focused = self.focused
         if not isinstance(focused, ListView) or not focused.children:
             return False
-        indexes = range(len(focused.children) - 1, -1, -1) if end else range(len(focused.children))
+        indexes = (
+            range(len(focused.children) - 1, -1, -1)
+            if end
+            else range(len(focused.children))
+        )
         for idx in indexes:
             child = focused.children[idx]
             if not getattr(child, "disabled", False):
@@ -488,7 +496,9 @@ class PKBApp(CommandMixin, DashboardViewsMixin, App):
                 event.prevent_default()
             elif event.key == "tab":
                 current = focused.value.lstrip(":;")
-                matches = [c for c in COMMANDS if c.startswith(current) and c != current]
+                matches = [
+                    c for c in COMMANDS if c.startswith(current) and c != current
+                ]
                 if matches:
                     focused.value = matches[0]
                     focused.cursor_position = len(focused.value)

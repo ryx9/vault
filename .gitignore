@@ -9,6 +9,7 @@ wheels/
 # Virtual environments
 .venv/
 notes/
+notes/**
 # PKB runtime cache (regenerated from notes/)
 .pkb/
 
