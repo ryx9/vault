@@ -19,6 +19,7 @@ _FTS_SPECIAL = re.compile(r'[":*^]')
 
 
 def _connect() -> sqlite3.Connection:
+    config.ensure_dirs()
     conn = sqlite3.connect(config.SEARCH_DB)
     conn.execute(
         """
@@ -54,10 +55,8 @@ def index_file(path: Path) -> None:
         for chunk in parser.chunk_markdown(path):
             if chunk.heading:
                 rows.append((rel, chunk.heading, chunk.heading, "heading"))
+        if chunk.text:
             rows.append((rel, chunk.heading, chunk.text, "body"))
-
-        for todo in parser.extract_todo_texts(path):
-            rows.append((rel, "", todo, "todo"))
 
         conn.executemany(
             "INSERT INTO chunks (path, heading, content, kind) VALUES (?, ?, ?, ?)",
@@ -89,10 +88,15 @@ def ensure_indexed(notes_dir: Path = config.NOTES_DIR) -> None:
 
 def _sanitize(query: str) -> str:
     """Turn free text into a safe FTS5 MATCH expression (prefix OR query)."""
-    terms = [t for t in _FTS_SPECIAL.sub(" ", query).split() if t]
+    cleaned = re.sub(r"[^0-9A-Za-z_]+", " ", query)
+    terms = [t for t in cleaned.split() if t]
     if not terms:
         return ""
     return " OR ".join(f"{t}*" for t in terms)
+
+
+def _like_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def keyword_search(query: str, top_k: int = 20) -> list[dict]:
@@ -113,6 +117,21 @@ def keyword_search(query: str, top_k: int = 20) -> list[dict]:
             (match_expr, top_k),
         )
         rows = cur.fetchall()
+
+        if not rows:
+            like_term = f"%{_like_escape(query.strip())}%"
+            cur = conn.execute(
+                """
+                SELECT path, heading, content, kind, 0.0 AS rank
+                FROM chunks
+                WHERE path LIKE ? ESCAPE '\\'
+                   OR heading LIKE ? ESCAPE '\\'
+                   OR content LIKE ? ESCAPE '\\'
+                LIMIT ?
+                """,
+                (like_term, like_term, like_term, top_k),
+            )
+            rows = cur.fetchall()
 
     results = []
     for path, heading, content, kind, rank in rows:

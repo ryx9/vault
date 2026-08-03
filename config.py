@@ -22,9 +22,15 @@ LOGS_DIR = PKB_DIR / "logs"
 SEARCH_DB = PKB_DIR / "search.db"
 META_DB = PKB_DIR / "meta.db"
 
-EMBEDDING_MODEL = os.environ.get("PKB_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+EMBEDDING_MODEL = os.environ.get(
+    "PKB_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2"
+)
 CHROMA_COLLECTION = "pkb_chunks"
-ENABLE_SEMANTIC_SEARCH = os.environ.get("PKB_ENABLE_SEMANTIC_SEARCH", "0").lower() in ("1", "true", "yes")
+ENABLE_SEMANTIC_SEARCH = os.environ.get("PKB_ENABLE_SEMANTIC_SEARCH", "0").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL = os.environ.get("PKB_LLM_MODEL", "google/gemma-3-12b-it:free")

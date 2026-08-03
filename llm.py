@@ -28,14 +28,17 @@ def _build_prompt(question: str, chunks: list[retriever.Result]) -> str:
             context_blocks.append(f"{label}\n{c.text}")
         context = "\n\n".join(context_blocks)
         return (
-            "Answer the question using the notes below when they are relevant. Cite "
-            "sources only when you reference them. If the notes are not relevant, "
-            "answer helpfully without inventing citations.\n\n"
+            "You are a helpful personal notes assistant. Use only the notes below to answer the question. "
+            "Do not invent facts or make assumptions beyond the provided notes. "
+            "Cite each note path you use in brackets like [path/to/note.md]. "
+            "If the notes do not contain the answer, reply: 'I don't know based on the provided notes.' "
+            "Be concise and factual.\n\n"
             f"NOTES:\n{context}\n\nQUESTION: {question}"
         )
     return (
-        "Answer the question helpfully. Use the notes below when they are relevant, "
-        "but if there are no relevant notes, respond naturally and conversationally.\n\n"
+        "You are a helpful personal notes assistant. If the notes are not relevant, "
+        "answer honestly and concisely, and do not fabricate citations. "
+        "If you cannot answer from the notes, say 'I don't know based on the provided notes.'\n\n"
         f"QUESTION: {question}"
     )
 

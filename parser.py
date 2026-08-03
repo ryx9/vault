@@ -60,7 +60,7 @@ def chunk_markdown(path: Path) -> list[Chunk]:
 
     def flush() -> None:
         body = "\n".join(buffer).strip()
-        if body:
+        if body or current_heading:
             chunks.append(Chunk(path=rel, heading=current_heading, text=body))
 
     for line in text.splitlines():
