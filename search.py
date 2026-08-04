@@ -119,7 +119,8 @@ def keyword_search(query: str, top_k: int = 20) -> list[dict]:
         rows = cur.fetchall()
 
         if not rows and " AND " in match_expr:
-            alt_expr = " OR ".join(f"{t}*" for t in cleaned.split())
+            cleaned_terms = [t for t in re.sub(r"[^0-9A-Za-z_]+", " ", query).split() if t]
+            alt_expr = " OR ".join(f"{t}*" for t in cleaned_terms)
             cur = conn.execute(
                 """
                 SELECT path, heading, content, kind, bm25(chunks) AS rank

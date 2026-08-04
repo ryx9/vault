@@ -69,6 +69,29 @@ def _path_boost(path: str, heading: str, query: str) -> float:
     return 0.0
 
 
+def _graph_neighbor_paths(results: list[Result]) -> set[str]:
+    neighbors: set[str] = set()
+    for result in results[:6]:
+        for reference in parser.extract_references_from_text(result.text, base_path=result.path):
+            neighbors.add(reference)
+    return neighbors
+
+
+def _add_graph_neighbors(scored: dict[str, Result], query: str, recent_scores: dict[str, float]) -> None:
+    graph_paths = _graph_neighbor_paths(sorted(scored.values(), key=lambda r: r.score, reverse=True))
+    if not graph_paths:
+        return
+
+    for path in list(graph_paths)[:8]:
+        file_path = config.NOTES_DIR / path
+        if not file_path.exists() or not file_path.is_file():
+            continue
+        for chunk in parser.chunk_markdown(file_path):
+            boost = BOOST_GRAPH + _path_boost(path, chunk.heading, query)
+            boost += BOOST_RECENT * recent_scores.get(path, 0.0)
+            _merge(scored, chunk.path, chunk.heading, chunk.text, boost)
+
+
 def _merge(scored: dict[str, Result], path: str, heading: str, text: str, score: float) -> None:
     existing = scored.get(path)
     if existing is None or score > existing.score:
@@ -116,6 +139,8 @@ def hybrid_search(query: str, top_k: int = 10, use_semantic: bool | None = None)
                 _merge(scored, r["path"], r["heading"], r["text"], max(r["score"], 0.0) * WEIGHT_SEMANTIC + boost)
         except Exception:
             pass
+
+    _add_graph_neighbors(scored, query, recent_scores)
 
     if not scored and query_lower:
         # Guarantee that a plain path or filename match is still surfaced.

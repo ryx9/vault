@@ -14,6 +14,73 @@ import config
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 
+_NOTE_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+_WIKILINK_RE = re.compile(r"\[\[([^\]\n]+)\]\]")
+_HEADING_REF_RE = re.compile(r"(?<!\w)#([A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*)")
+
+
+def _resolve_reference_path(spec: str, base_path: str | Path | None = None) -> str | None:
+    candidate = str(spec or "").strip().strip("<>")
+    if not candidate:
+        return None
+
+    if candidate.startswith(("http://", "https://", "mailto:")):
+        return None
+
+    if "#" in candidate:
+        candidate = candidate.split("#", 1)[0].strip()
+    if not candidate:
+        return None
+
+    candidate = candidate.replace("\\", "/").lstrip("/")
+    while candidate.startswith("./"):
+        candidate = candidate[2:]
+    if candidate.startswith("notes/"):
+        candidate = candidate[len("notes/") :]
+
+    base_dir = Path(".")
+    if base_path:
+        base_note = Path(str(base_path))
+        base_dir = base_note.parent if base_note.suffix.lower() == ".md" else base_note
+
+    for base in {Path("."), base_dir}:
+        candidate_path = (config.NOTES_DIR / base / candidate).resolve()
+        try:
+            candidate_path.relative_to(config.NOTES_DIR.resolve())
+        except ValueError:
+            continue
+        if candidate_path.suffix.lower() != ".md":
+            candidate_path = candidate_path.with_suffix(".md")
+        if candidate_path.exists() and candidate_path.is_file():
+            return relative_path(candidate_path)
+
+    return None
+
+
+def extract_references_from_text(text: str, base_path: str | Path | None = None) -> list[str]:
+    references: list[str] = []
+    seen: set[str] = set()
+
+    for match in _NOTE_LINK_RE.finditer(text):
+        resolved = _resolve_reference_path(match.group(1), base_path=base_path)
+        if resolved and resolved not in seen:
+            references.append(resolved)
+            seen.add(resolved)
+
+    for match in _WIKILINK_RE.finditer(text):
+        resolved = _resolve_reference_path(match.group(1), base_path=base_path)
+        if resolved and resolved not in seen:
+            references.append(resolved)
+            seen.add(resolved)
+
+    for match in _HEADING_REF_RE.finditer(text):
+        resolved = _resolve_reference_path(match.group(1), base_path=base_path)
+        if resolved and resolved not in seen:
+            references.append(resolved)
+            seen.add(resolved)
+
+    return references
+
 
 @dataclass
 class Chunk:

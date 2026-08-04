@@ -103,9 +103,11 @@ and resynced on every file change.
 Set in `.env`:
 
 ```bash
-OPENROUTER_API_KEY=sk-...
-vault_LLM_MODEL=google/gemma-3-12b-it:free
+GEMINI_API_KEY=...
+PKB_LLM_MODEL=gemini-3.5-pro
 ```
+
+If you prefer OpenRouter fallback, `OPENROUTER_API_KEY` with `PKB_LLM_MODEL=google/gemma-3-12b-it:free` still works.
 
 `ask` always retrieves relevant chunks first and works with **no LLM
 configured** — it just shows retrieved notes.

@@ -3,7 +3,12 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from textual import events, work
 from textual.app import App, ComposeResult
@@ -75,6 +80,7 @@ class PKBApp(CommandMixin, DashboardViewsMixin, App):
                 yield Input(placeholder="Type a command", id="cmd")
             with Horizontal(id="footer_meta"):
                 yield Static("Ready", id="status_line")
+                yield Static("", id="llm_backend")
                 yield Static(self._render_hints(), id="hints")
 
     def on_mount(self) -> None:
@@ -82,10 +88,11 @@ class PKBApp(CommandMixin, DashboardViewsMixin, App):
         notes_fs.ensure_today_journal()
         search.ensure_indexed()
         self.refresh_dashboard()
-        llm_status = "LLM ready" if config.OPENROUTER_API_KEY else "no LLM key"
+        llm_status = "LLM ready" if (config.GEMINI_API_KEY or config.OPENROUTER_API_KEY) else "no LLM key"
         self._chat_write_system(
             f"Ready - {llm_status}. Ask anything about your notes, or use the command bar below."
         )
+        self._set_llm_backend_label()
         self._observer = watcher.start_watching(self._on_file_change)
         self.set_focus(self.query_one("#dashboard_list", ListView))
 
@@ -123,6 +130,10 @@ class PKBApp(CommandMixin, DashboardViewsMixin, App):
         self._set_status(text)
         log = self.query_one("#chat_log", RichLog)
         log.write(f"[dim]status[/dim]  {text}")
+
+    def _set_llm_backend_label(self) -> None:
+        label = "LLM: " + llm.backend_label()
+        self.query_one("#llm_backend", Static).update(label)
 
     def _chat_write_user(self, text: str) -> None:
         log = self.query_one("#chat_log", RichLog)
