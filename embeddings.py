@@ -8,6 +8,8 @@ be regenerated from the markdown files at any time via reindex.
 from __future__ import annotations
 
 import hashlib
+import io
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import chromadb
@@ -27,6 +29,24 @@ def get_model():
 
         _model = SentenceTransformer(config.EMBEDDING_MODEL)
     return _model
+
+
+def preload_model() -> None:
+    """Load the embedding model and Chroma collection quietly on startup."""
+    global _model, _collection
+    if _model is not None and _collection is not None:
+        return
+
+    try:
+        from transformers.utils import logging as transformers_logging
+
+        transformers_logging.set_verbosity_error()
+    except ImportError:
+        pass
+
+    with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+        get_model()
+        get_collection()
 
 
 def get_collection():

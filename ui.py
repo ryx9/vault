@@ -88,7 +88,7 @@ class PKBApp(CommandMixin, DashboardViewsMixin, App):
         notes_fs.ensure_today_journal()
         search.ensure_indexed()
         self.refresh_dashboard()
-        llm_status = "LLM ready" if (config.GEMINI_API_KEY or config.OPENROUTER_API_KEY) else "no LLM key"
+        llm_status = "LLM ready" if llm.is_configured() else "no LLM key"
         self._chat_write_system(
             f"Ready - {llm_status}. Ask anything about your notes, or use the command bar below."
         )

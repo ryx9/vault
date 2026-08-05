@@ -17,6 +17,7 @@ import config
 import db
 import embeddings
 import search
+import tasks
 
 
 class _MarkdownHandler(FileSystemEventHandler):
@@ -46,6 +47,7 @@ class _MarkdownHandler(FileSystemEventHandler):
             embeddings.remove_file_embeddings(rel)
             search.remove_file(rel)
         else:
+            tasks.canonicalize_task_dates_in_file(path)
             embeddings.reindex_file(path)
             search.index_file(path)
 

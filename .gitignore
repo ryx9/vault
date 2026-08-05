@@ -10,6 +10,7 @@ wheels/
 .venv/
 notes/
 notes/**
+notes/journal/
 # PKB runtime cache (regenerated from notes/)
 .pkb/
 

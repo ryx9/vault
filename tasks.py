@@ -67,6 +67,65 @@ def parse_task_text(raw_text: str) -> tuple[str, date | None]:
     return title, parsed_dt.date()
 
 
+def canonicalize_task_text(raw_text: str) -> str:
+    """Return a task body with the first date phrase rewritten as ISO date."""
+    matches = dateparser.search.search_dates(
+        raw_text,
+        settings={"PREFER_DATES_FROM": "future", "RELATIVE_BASE": datetime.now()},
+    )
+    if not matches:
+        return raw_text
+
+    phrase, parsed_dt = matches[0]
+    if len(phrase.strip()) < 2:
+        return raw_text
+
+    expanded = _expand_phrase(raw_text, phrase)
+    iso_date = parsed_dt.date().isoformat()
+    if expanded == iso_date:
+        return raw_text
+    return raw_text.replace(expanded, iso_date, 1)
+
+
+def canonicalize_task_dates_in_file(path: Path) -> bool:
+    """Rewrite TODO lines in a file to use explicit ISO due dates."""
+    text = parser.read_file(path)
+    if not text:
+        return False
+
+    lines: list[str] = []
+    changed = False
+    for line in text.splitlines():
+        idx = line.find(config.TODO_PATTERN)
+        if idx == -1:
+            lines.append(line)
+            continue
+
+        rest = line[idx + len(config.TODO_PATTERN) :].strip()
+        body, done = parser._parse_todo_rest(rest)
+        if not body:
+            lines.append(line)
+            continue
+
+        canonical_body = canonicalize_task_text(body)
+        if done:
+            canonical_body = f"{config.DONE_PREFIX} {canonical_body}"
+
+        if canonical_body != rest:
+            prefix = line[: idx + len(config.TODO_PATTERN)]
+            lines.append(f"{prefix} {canonical_body}".rstrip())
+            changed = True
+        else:
+            lines.append(line)
+
+    if not changed:
+        return False
+
+    ending = "\n" if text.endswith("\n") else ""
+    path.write_text("\n".join(lines) + ending, encoding="utf-8")
+    return True
+
+
 def extract_tasks_from_file(path: Path) -> list[Task]:
     rel = parser.relative_path(path)
     result: list[Task] = []

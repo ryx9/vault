@@ -34,15 +34,14 @@ log = logging.getLogger(__name__)
 # Lazy SDK import — only needed when GEMINI_API_KEY is set
 # ---------------------------------------------------------------------------
 
+
 def _gemini_client():
     """Return a configured Gemini GenerativeModel (google-genai SDK)."""
     try:
         from google import genai  # type: ignore
         from google.genai import types  # type: ignore  # noqa: F401
     except ImportError as exc:
-        raise ImportError(
-            "google-genai is required: pip install google-genai"
-        ) from exc
+        raise ImportError("google-genai is required: pip install google-genai") from exc
 
     client = genai.Client(api_key=config.GEMINI_API_KEY)
     return client
@@ -150,15 +149,27 @@ def execute_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
         if not query:
             return {"success": False, "error": "query is required"}
         results = search.keyword_search(query, top_k=int(args.get("top_k", 5)))
-        return {"success": True, "tool": "search_notes", "query": query, "results": results}
+        return {
+            "success": True,
+            "tool": "search_notes",
+            "query": query,
+            "results": results,
+        }
 
     if tool_name == "search_journals":
         query = str(args.get("query", "")).strip()
         if not query:
             return {"success": False, "error": "query is required"}
         results = search.keyword_search(query, top_k=int(args.get("top_k", 5)))
-        journal_results = [r for r in results if str(r.get("path", "")).startswith("journal/")]
-        return {"success": True, "tool": "search_journals", "query": query, "results": journal_results}
+        journal_results = [
+            r for r in results if str(r.get("path", "")).startswith("journal/")
+        ]
+        return {
+            "success": True,
+            "tool": "search_journals",
+            "query": query,
+            "results": journal_results,
+        }
 
     if tool_name == "read_note":
         spec = str(args.get("path", "")).strip()
@@ -175,7 +186,12 @@ def execute_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
             return {"success": False, "error": f"note not found: {resolved}"}
 
         content = parser.read_file(path)
-        return {"success": True, "tool": "read_note", "path": resolved, "content": content}
+        return {
+            "success": True,
+            "tool": "read_note",
+            "path": resolved,
+            "content": content,
+        }
 
     if tool_name == "list_tasks":
         include_done = bool(args.get("include_done", False))
@@ -196,15 +212,18 @@ def execute_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Retrieval helpers (unchanged from original — already well-designed)
+# Retrieval helpers
 # ---------------------------------------------------------------------------
+
 
 def _expand_chunks_with_graph(chunks: list[retriever.Result]) -> list[retriever.Result]:
     """Follow one hop of wiki-links to pull in referenced notes."""
     seen = {c.path for c in chunks}
     extras: list[retriever.Result] = []
     for chunk in chunks[:6]:
-        for ref in parser.extract_references_from_text(chunk.text, base_path=chunk.path):
+        for ref in parser.extract_references_from_text(
+            chunk.text, base_path=chunk.path
+        ):
             if ref in seen:
                 continue
             path = config.NOTES_DIR / ref
@@ -213,7 +232,9 @@ def _expand_chunks_with_graph(chunks: list[retriever.Result]) -> list[retriever.
             for rc in parser.chunk_markdown(path):
                 if rc.text.strip():
                     extras.append(
-                        retriever.Result(path=rc.path, heading=rc.heading, text=rc.text, score=0.0)
+                        retriever.Result(
+                            path=rc.path, heading=rc.heading, text=rc.text, score=0.0
+                        )
                     )
             seen.add(ref)
     return chunks + extras
@@ -271,7 +292,9 @@ def _run_gemini_agent(
         for msg in history:
             role = "user" if msg.get("role") == "user" else "model"
             contents.append(
-                types.Content(role=role, parts=[types.Part(text=msg.get("content", ""))])
+                types.Content(
+                    role=role, parts=[types.Part(text=msg.get("content", ""))]
+                )
             )
     contents.append(types.Content(role="user", parts=[types.Part(text=user_content)]))
 
@@ -300,11 +323,21 @@ def _run_gemini_agent(
         )
 
         candidate = response.candidates[0]
-        parts = candidate.content.parts
+        parts = candidate.content.parts or []
 
         # Collect all function calls in this response
-        function_calls = [p.function_call for p in parts if getattr(p, "function_call", None) is not None]
-        text_parts = [p for p in parts if getattr(p, "text", None)]
+        function_calls = [
+            p.function_call
+            for p in parts
+            if getattr(p, "function_call", None) is not None
+        ]
+
+        # Filter out internal thought parts from text output
+        text_parts = [
+            p
+            for p in parts
+            if getattr(p, "text", None) and not getattr(p, "thought", False)
+        ]
 
         if not function_calls:
             # Model returned a final text answer — we're done
@@ -333,8 +366,12 @@ def _run_gemini_agent(
         contents.append(types.Content(role="user", parts=tool_response_parts))
 
     # Fallback if we hit the turn limit
-    log.warning("Agent hit MAX_AGENT_TURNS (%d) without a final answer.", MAX_AGENT_TURNS)
-    return "(Agent reached the maximum number of reasoning steps without a final answer.)"
+    log.warning(
+        "Agent hit MAX_AGENT_TURNS (%d) without a final answer.", MAX_AGENT_TURNS
+    )
+    return (
+        "(Agent reached the maximum number of reasoning steps without a final answer.)"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -379,6 +416,7 @@ def _run_openrouter(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def _configured_backends() -> list[str]:
     backends: list[str] = []

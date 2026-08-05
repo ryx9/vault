@@ -12,11 +12,19 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import config
+import threading
 import ui
+import embeddings
 
 
 def main() -> None:
     config.ensure_dirs()
+    preload_thread = threading.Thread(
+        target=embeddings.preload_model,
+        name="embeddings-preload",
+        daemon=True,
+    )
+    preload_thread.start()
     ui.run()
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+from textual import work
 from textual.widgets import Input, RichLog
 
 import db
@@ -138,14 +139,27 @@ class CommandMixin:
             return
         self.mode = Mode.SEARCH
         self._update_mode_badge()
+        self._chat_write_system(f"[dim]searching for '{query}'...[/dim]")
+        self._start_search(query)
+
+    @work(thread=True)
+    def _start_search(self, query: str) -> None:
         results = retriever.hybrid_search(query, top_k=10)
+        self.call_from_thread(self._finish_search, query, results)
+
+    def _finish_search(self, query: str, results: list[retriever.Result]) -> None:
         self._populate_search_results(results)
         if not results:
             self._chat_write_system(f"no results for '{query}'")
+            self.set_focus(self.query_one("#dashboard_list"))
         else:
             self._chat_write_system(
                 f"[dim]{len(results)} results for '{query}' - enter to open · Esc to clear[/dim]"
             )
+            search_list = self.query_one("#search_list")
+            self.set_focus(search_list)
+            if hasattr(search_list, "index"):
+                search_list.index = 0
         self.mode = Mode.NORMAL
         self._update_mode_badge()
 
@@ -186,8 +200,18 @@ class CommandMixin:
             rel = parser.relative_path(path)
             self._chat_write_system(f"created {rel}")
             self.open_in_editor(path)
-        except FileExistsError as exc:
-            self._chat_write_system(f"note already exists: {exc}")
+        except FileExistsError:
+            existing = notes_fs.resolve_note_path(
+                f"{folder}/{name}" if folder else name
+            )
+            if existing:
+                rel = parser.relative_path(existing)
+                self._chat_write_system(f"opened existing note: {rel}")
+                self.open_in_editor(existing)
+            else:
+                self._chat_write_system(
+                    f"note already exists but could not resolve path: {name}"
+                )
 
     def _create_journal(self, date_str: str) -> None:
         if date_str:
